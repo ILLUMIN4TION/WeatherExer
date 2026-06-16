@@ -1,0 +1,170 @@
+{
+  "back hair": {
+    "x": 161,
+    "y": 34,
+    "width": 603,
+    "height": 640,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "footwear": {
+    "x": 161,
+    "y": 675,
+    "width": 117,
+    "height": 225,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "legwear": {
+    "x": 235,
+    "y": 621,
+    "width": 577,
+    "height": 387,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "bottomwear": {
+    "x": 219,
+    "y": 547,
+    "width": 298,
+    "height": 251,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "handwear-l": {
+    "x": 568,
+    "y": 245,
+    "width": 208,
+    "height": 369,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "topwear": {
+    "x": 307,
+    "y": 303,
+    "width": 421,
+    "height": 384,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "neck": {
+    "x": 472,
+    "y": 233,
+    "width": 123,
+    "height": 165,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "face": {
+    "x": 475,
+    "y": 89,
+    "width": 205,
+    "height": 221,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "handwear-r": {
+    "x": 210,
+    "y": 343,
+    "width": 271,
+    "height": 681,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "nose": {
+    "x": 599,
+    "y": 194,
+    "width": 17,
+    "height": 17,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "mouth": {
+    "x": 568,
+    "y": 226,
+    "width": 167,
+    "height": 128,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyewhite-r": {
+    "x": 518,
+    "y": 175,
+    "width": 62,
+    "height": 13,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyewhite-l": {
+    "x": 624,
+    "y": 196,
+    "width": 40,
+    "height": 20,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyebrow-l": {
+    "x": 636,
+    "y": 153,
+    "width": 38,
+    "height": 32,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "irides-r": {
+    "x": 534,
+    "y": 171,
+    "width": 36,
+    "height": 18,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "irides-l": {
+    "x": 623,
+    "y": 194,
+    "width": 31,
+    "height": 19,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyelash-l": {
+    "x": 619,
+    "y": 180,
+    "width": 67,
+    "height": 39,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyebrow-r": {
+    "x": 526,
+    "y": 135,
+    "width": 75,
+    "height": 11,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "ears-r": {
+    "x": 457,
+    "y": 193,
+    "width": 51,
+    "height": 65,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "eyelash-r": {
+    "x": 497,
+    "y": 163,
+    "width": 88,
+    "height": 26,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  },
+  "front hair": {
+    "x": 477,
+    "y": 24,
+    "width": 280,
+    "height": 254,
+    "canvas_width": 1024,
+    "canvas_height": 1024
+  }
+}

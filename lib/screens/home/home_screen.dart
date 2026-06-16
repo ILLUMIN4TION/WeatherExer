@@ -1,6 +1,8 @@
-import 'dart:ui' as ui;
+import 'dart:convert';
+import 'dart:math' as math;
+import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:flutter/physics.dart'; // 💡 물리 시뮬레이션을 위해 필수!
+import 'package:flutter/services.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -9,140 +11,371 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
-  Offset _dragOffset = Offset.zero;
-  Offset _releaseOffset = Offset.zero; // 손을 뗀 순간의 좌표 저장용
-  late AnimationController _springController;
+class _HomeScreenState extends State<HomeScreen>
+    with SingleTickerProviderStateMixin {
+  Map<String, dynamic>? _partsData;
+  late AnimationController _idleController;
 
-  final String _basePath = 'assets/characters/huge_breasts/summer_clear';
+  // 🔥 1. 날씨 및 구도 상태를 관리하는 변수 (나중에 ViewModel이나 Provider로 분리될 부분)
+  final String _currentSeason = 'spring';
+  final String _currentWeather = 'clear';
+  final String _currentAngle = 'mid'; // low, mid, high
+
+  final String _characterBasePath =
+      'assets/characters/huge_breasts/summer_clear_twintail';
 
   @override
   void initState() {
     super.initState();
-    // 애니메이션 시간(Duration)을 조절해서 튕기는 길이를 정할 수 있어
-    _springController = AnimationController(vsync: this, duration: const Duration(milliseconds: 1000));
-    
-    _springController.addListener(() {
-      setState(() {
-        // 1.0 에서 0.0 으로 줄어드는 컨트롤러 값을 곱해서 쫀득하게 원점 복귀!
-        _dragOffset = _releaseOffset * _springController.value;
-      });
+    _loadPartsData();
+
+    _idleController = AnimationController(
+      vsync: this,
+      duration: const Duration(seconds: 3),
+    )..repeat();
+  }
+
+  Future<void> _loadPartsData() async {
+    final String jsonString = await rootBundle.loadString(
+      '$_characterBasePath/parts_info.json',
+    );
+    final Map<String, dynamic> data = json.decode(jsonString);
+    setState(() {
+      _partsData = data;
     });
   }
 
   @override
   void dispose() {
-    _springController.dispose();
+    _idleController.dispose();
     super.dispose();
+  }
+
+  Offset _getBreathingOffset(String partName, double progress) {
+    final double t = progress * 2 * math.pi;
+    if (partName.contains('bottom') ||
+        partName.contains('leg') ||
+        partName.contains('foot')) {
+      return Offset.zero;
+    }
+    if (partName.contains('hand') || partName.contains('arm')) {
+      return Offset(0, math.sin(t - 0.5) * 3);
+    }
+    return Offset(0, math.sin(t) * 4.0);
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_partsData == null) {
+      return const Scaffold(
+        backgroundColor: Color(0xFF121212),
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final firstPartInfo = _partsData!.values.first;
+    final double canvasW = firstPartInfo['canvas_width'].toDouble();
+    final double canvasH = firstPartInfo['canvas_height'].toDouble();
+
+    // 동적으로 배경 이미지 경로 생성
+    final String backgroundPath =
+        'assets/backgrounds/$_currentSeason/${_currentWeather}_$_currentAngle.png';
+
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      body: Center(
-        // 1. 크리타 이미지 비율(1200/1216)로 캔버스를 고정! (레터박스 방지)
-        child: AspectRatio(
-          aspectRatio: 1200 / 1216,
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              final w = constraints.maxWidth;
-              final h = constraints.maxHeight;
+      // 🔥 핵심 1: 배경 이미지가 화면 맨 밑끝까지 내려가도록 허용!
+      extendBody: true,
 
-              return Stack(
-                fit: StackFit.expand, // 꽉 채우기
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ☁️ [Layer 1] 동적 배경 이미지
+          Image.asset(
+            backgroundPath,
+            fit: BoxFit.cover, // 화면 꽉 차게 비율 유지
+            // 에러 처리: 이미지가 없을 경우 임시 색상 표시
+            errorBuilder: (context, error, stackTrace) => Container(
+              color: const Color(0xFF4A90E2),
+              alignment: Alignment.center,
+              child: const Text(
+                '배경 이미지 없음',
+                style: TextStyle(color: Colors.white),
+              ),
+            ),
+          ),
+
+          // 💃 [Layer 2] 숨쉬는 L2D 캐릭터
+          Align(
+            alignment: Alignment.bottomCenter,
+            child: AnimatedBuilder(
+              animation: _idleController,
+              builder: (context, child) {
+                return AspectRatio(
+                  aspectRatio: canvasW / canvasH,
+                  child: LayoutBuilder(
+                    builder: (context, constraints) {
+                      final w = constraints.maxWidth;
+                      final h = constraints.maxHeight;
+                      List<Widget> stackChildren = [];
+
+                      _partsData!.forEach((partName, info) {
+                        final double x = info['x'].toDouble();
+                        final double y = info['y'].toDouble();
+                        final double partW = info['width'].toDouble();
+                        final double partH = info['height'].toDouble();
+
+                        final Offset currentOffset = _getBreathingOffset(
+                          partName,
+                          _idleController.value,
+                        );
+
+                        double angle = 0.0;
+                        Alignment transformAlignment = Alignment.center;
+
+                        if (partName.contains('hair')) {
+                          transformAlignment = Alignment.topCenter;
+                          final double t = _idleController.value * 2 * math.pi;
+                          angle = math.sin(t * 1.5) * 0.03;
+                        }
+
+                        stackChildren.add(
+                          Positioned(
+                            left: w * (x / canvasW),
+                            top: h * (y / canvasH),
+                            width: w * (partW / canvasW),
+                            height: h * (partH / canvasH),
+                            child: Transform.translate(
+                              offset: currentOffset,
+                              child: Transform.rotate(
+                                angle: angle,
+                                alignment: transformAlignment,
+                                child: Image.asset(
+                                  '$_characterBasePath/$partName.PNG',
+                                  fit: BoxFit.fill,
+                                ),
+                              ),
+                            ),
+                          ),
+                        );
+                      });
+
+                      return Stack(
+                        fit: StackFit.expand,
+                        children: stackChildren,
+                      );
+                    },
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // 💬 [Layer 3] 상단 UI (위치, 온도, 글래스모피즘 말풍선)
+          SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 20.0,
+                vertical: 20.0,
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 레이어 1: 바탕 몸통
-                  Image.asset('$_basePath/base.PNG', fit: BoxFit.cover),
+                  // 좌측: 위치 및 날씨 정보
+                  Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: const [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.location_on,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          SizedBox(width: 4),
+                          Text(
+                            '경기도 부천시',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ],
+                      ),
+                      Text(
+                        '23°',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 80,
+                          fontWeight: FontWeight.w300,
+                          height: 1.1,
+                        ),
+                      ),
+                      Text(
+                        '맑음',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
 
-                  // 레이어 2: 출렁이는 가슴 파츠 (형태 유지 + 윗부분 고정 변형)
-                  // 레이어 2: 출렁이는 가슴 파츠 (윗선 완벽 고정)
-Transform(
-  // 🔥 핵심: 0.35라는 수치를 네 이미지에 맞게 깎아야 해!
-  // 0.0은 이미지 맨 위, 1.0은 맨 아래야. 
-  // 캐릭터의 쇄골/가슴 윗선이 전체 이미지 높이의 약 30~40% 지점에 있을 테니 임시로 0.35를 줬어.
-  alignment: FractionalOffset(0.5, 0.35), 
-  transform: Matrix4.identity()
-    // 좌우(X축) 왜곡: 윗선(0.35 지점)은 가만히 있고 아래쪽만 좌우로 흔들림
-    ..setEntry(0, 1, (_dragOffset.dx * 0.005).clamp(-0.15, 0.15))
-    // 상하(Y축) 늘림: 윗선(0.35 지점)은 고정된 채 아래쪽으로만 쭈욱 늘어남
-    ..scale(1.0, (1.0 + _dragOffset.dy * 0.003).clamp(0.8, 1.3)),
-  child: Image.asset(
-    '$_basePath/breasts.PNG',
-    fit: BoxFit.cover,
-  ),
-),
-
-                  // 레이어 3: 왼팔 파츠
-                  Image.asset('$_basePath/hand.PNG', fit: BoxFit.cover),
-
-                  // 🚨 레이어 4: [눈에 보이는 히트박스] 이 안에서만 드래그 가능!
-                  Positioned(
-                    // 빨간 박스가 가슴 위에 오도록 위치와 크기를 조절해 (비율 기반)
-                    left: w * 0.25,  // 가로 시작점
-                    top: h * 0.45,   // 세로 시작점 (가슴 윗선 근처)
-                    width: w * 0.5,  // 박스 너비
-                    height: h * 0.25,// 박스 높이
-                    
-                    child: GestureDetector(
-                      // 터치, 드래그 로직 (이전의 isValidHit 검사가 필요 없어짐!)
-                      onPanDown: (_) {
-      _springController.stop(); // 누르면 튕기던 거 멈춤
-    },
-    onPanUpdate: (details) {
-      setState(() {
-        _dragOffset += details.delta * 0.6; // 당길 때의 저항감
-      });
-    },
-    onPanEnd: (details) {
-      // 손을 떼는 순간, 현재 늘어난 거리를 저장하고 1.0부터 0.0으로 고무줄 애니메이션 시작!
-      _releaseOffset = _dragOffset;
-      _springController.value = 1.0;
-      _springController.animateTo(0.0, curve: Curves.elasticOut); 
-    },
-                      
-                      child: Container(
-                        // 🛑 여기서 빨간 박스를 눈으로 보면서 위의 left, top, width, height 수치를 맞춰!
-                        // 완벽하게 가슴을 덮도록 수치를 찾은 뒤엔, 색상을 Colors.transparent 로 바꾸면 끝!
-                        color: Colors.red.withOpacity(0.4), 
+                  // 우측: 글래스모피즘 말풍선
+                  Flexible(
+                    child: Padding(
+                      padding: const EdgeInsets.only(top: 20.0, left: 20.0),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(20),
+                        child: BackdropFilter(
+                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.white.withOpacity(0.15),
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 1.5,
+                              ),
+                            ),
+                            child: const Text(
+                              '바람도 선선하고 볕이 참 좋아! 새싹이 금방 자라겠는걸?',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 15,
+                                height: 1.4,
+                              ),
+                              softWrap: true,
+                            ),
+                          ),
+                        ),
                       ),
                     ),
                   ),
                 ],
-              );
-            },
+              ),
+            ),
           ),
-        ),
+          // 📊 [Layer 4] 플로팅 아일랜드 스타일 바텀 시트
+          Align(
+            alignment: Alignment.bottomCenter,
+            // 🏝️ 화면 양옆과 아래에 여백을 주어 둥둥 떠다니는 카드 느낌 구현
+            child: Padding(
+              padding: const EdgeInsets.only(
+                left: 16.0,
+                right: 16.0,
+                bottom: 100.0,
+              ),
+              // 🔥 마우스 드래그를 허용하는 마법의 세팅
+              child: ScrollConfiguration(
+                behavior: ScrollConfiguration.of(context).copyWith(
+                  dragDevices: {
+                    PointerDeviceKind.touch,
+                    PointerDeviceKind.mouse,
+                  },
+                ),
+                child: DraggableScrollableSheet(
+                  initialChildSize: 0.12,
+                  minChildSize: 0.12,
+                  maxChildSize: 0.75, // 카드 형태라 화면 끝까지 안 올라가게 제한
+                  snap: true,
+                  builder:
+                      (
+                        BuildContext context,
+                        ScrollController scrollController,
+                      ) {
+                        return ClipRRect(
+                          // 둥둥 떠있는 느낌을 위해 4면 모두 모서리를 둥글게 처리
+                          borderRadius: BorderRadius.circular(30),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+                            child: Container(
+                              decoration: BoxDecoration(
+                                color: Colors.black.withOpacity(0.3),
+                                // ✨ 유리 테두리 빛 반사 효과 (대각선 그라데이션)
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.4),
+                                  width: 1.5,
+                                ),
+                                borderRadius: BorderRadius.circular(30),
+                              ),
+                              child: ListView(
+                                controller: scrollController,
+                                padding: const EdgeInsets.symmetric(
+                                  vertical: 16,
+                                  horizontal: 24,
+                                ),
+                                children: [
+                                  // 드래그 핸들
+                                  Center(
+                                    child: Container(
+                                      width: 40,
+                                      height: 5,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withOpacity(0.6),
+                                        borderRadius: BorderRadius.circular(10),
+                                      ),
+                                    ),
+                                  ),
+                                  const SizedBox(height: 30),
+                                  const Text(
+                                    "☁️ 상세 날씨 정보", // 아이콘 추가 테스트
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 20),
+
+                                  // TODO: 나중에 이 부분을 GridView나 예쁜 아이콘 카드로 바꿀 예정
+                                  _buildDummyWeatherInfoTile("체감 온도", "24°"),
+                                  _buildDummyWeatherInfoTile("습도", "55%"),
+                                  _buildDummyWeatherInfoTile("풍속", "3m/s"),
+                                ],
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
-}
 
-// 🧮 X축과 Y축 스프링 물리를 동시에 결합해 주는 벡터 시뮬레이터 클래스
-class _VectorSpringSimulation extends Simulation {
-  final SpringSimulation xSim;
-  final SpringSimulation ySim;
-
-  _VectorSpringSimulation(this.xSim, this.ySim);
-
-  @override
-  double x(double time) => 0.0; // 사용 안 함
-
-  @override
-  double dx(double time) => 0.0; // 사용 안 함
-
-  @override
-  bool isDone(double time) => xSim.isDone(time) && ySim.isDone(time);
-
-  // 이 함수가 오프셋 오브젝트 자체를 매 타임 프레임마다 변환해서 넘겨줘
-  @override
-  dynamic Image(double time) {
-    return Offset(xSim.x(time), ySim.x(time));
+  // 임시 정보 타일 위젯 생성기 (클래스 맨 밑에 추가해 줘)
+  Widget _buildDummyWeatherInfoTile(String title, String value) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 15),
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white70, fontSize: 16),
+          ),
+          Text(
+            value,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ],
+      ),
+    );
   }
-  
-  // 내부 형변환 매칭 오류 방지용 캐스팅 오버라이드
-  @override
-  double getPosition(double time) => 0.0;
-  @override
-  double getVelocity(double time) => 0.0;
 }
