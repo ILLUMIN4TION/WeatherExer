@@ -40,4 +40,4 @@
 
 ## 기술 스택 (Tech Stacks) /추후 확정 시 수정
 
-ComfyUI + Anima /Wan2.2 + SmoothMix/ Qwen2.5 RP or Llama Korean RP /
+ComfyUI + Anima, Wan2.2 + SmoothMix, See-Through/ Qwen2.5 RP or Llama Korean RP /
