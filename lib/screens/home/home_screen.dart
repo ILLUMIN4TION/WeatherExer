@@ -2,7 +2,9 @@ import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:weathexer/services/chat_service.dart';
 import 'package:flutter/services.dart';
+import 'package:weathexer/services/audio_service.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -24,6 +26,48 @@ class _HomeScreenState extends State<HomeScreen>
   final String _characterBasePath =
       'assets/characters/huge_breasts/summer_clear_twintail';
 
+  bool _isLoading = false; // 🔥 강제 락을 위한 새로운 변수, 더블클릭으로 서버 뻗는 거 방지
+  final ChatService _chatService = ChatService();
+  final AudioQueueService _audioService = AudioQueueService(); // 🔥 오디오 매니저 투입!
+
+  String _currentAiText = "말풍선을 터치해서 대화를 시작해 보세요!";
+  bool _isTyping = false;
+
+  void _sendTestMessage() async {
+    if (_isLoading) return; 
+    _isLoading = true;
+
+    setState(() {
+      _currentAiText = "";
+      _isTyping = true;
+    });
+
+    await _audioService.clearQueue();
+
+    try {
+      await for (final chunk in _chatService.sendChatMessage("냉장고에서 꺼낸 차가운 캔 음료를 식탁에 올려두었더니 캔 표면에 물방울이 맺혔습니다. 이 물방울은 어디서 온 것인지 그 과학적 이유를 설명해 주세요")) {
+        final String textChunk = chunk['text'] ?? "";
+        final String audioBase64 = chunk['audio'] ?? "";
+
+        // 🔥 여기서 텍스트를 바로 UI에 그리지 않음!
+        
+        if (audioBase64.isNotEmpty) {
+          // 오디오와 텍스트를 한 번에 서비스로 넘겨서 묶어버림
+          await _audioService.addAudioChunk(audioBase64, textChunk);
+        }
+      }
+    } catch (e) {
+      setState(() {
+        _currentAiText = "연결 에러가 발생했어 ㅠㅠ";
+      });
+    } finally {
+      _isLoading = false;
+      setState(() {
+        _isTyping = false;
+      });
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -33,6 +77,31 @@ class _HomeScreenState extends State<HomeScreen>
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
+
+    // 🔥 sequenceStateStream 대신 currentIndexStream 사용!
+    // 오디오 파일이 큐에 추가될 때가 아니라, '실제로 다음 트랙이 스피커로 재생을 시작할 때'만 실행됨
+    _audioService.player.currentIndexStream.listen((index) {
+      if (index != null && index >= 0) {
+        final sequence = _audioService.player.sequence;
+        if (sequence != null && index < sequence.length) {
+          // 지금 딱 목소리가 나오기 시작한 그 오디오 조각의 텍스트만 가져와서 타이핑!
+          final textToType = sequence[index].tag as String;
+          _playTypingAnimation(textToType);
+        }
+      }
+    });
+  }
+
+  // 🔥 한 글자씩 출력하는 타이핑 애니메이션 함수
+  void _playTypingAnimation(String text) async {
+    for (int i = 0; i < text.length; i++) {
+      if (!mounted) break;
+      setState(() {
+        _currentAiText += text[i];
+      });
+      // TTS 말하는 속도에 맞춰 한 글자당 50ms 대기 (속도를 조절하고 싶으면 이 숫자를 변경해!)
+      await Future.delayed(const Duration(milliseconds: 50));
+    }
   }
 
   Future<void> _loadPartsData() async {
@@ -227,28 +296,43 @@ class _HomeScreenState extends State<HomeScreen>
                   Flexible(
                     child: Padding(
                       padding: const EdgeInsets.only(top: 20.0, left: 20.0),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(20),
-                        child: BackdropFilter(
-                          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                          child: Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: Colors.white.withOpacity(0.3),
-                                width: 1.5,
+                      // 🔥 말풍선을 터치하면 백엔드 통신 시작!
+                      child: GestureDetector(
+                        onTap: _isTyping ? null : _sendTestMessage,
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+                            child: Container(
+                              padding: const EdgeInsets.all(16),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                  color: Colors.white.withOpacity(0.3),
+                                  width: 1.5,
+                                ),
                               ),
-                            ),
-                            child: const Text(
-                              '바람도 선선하고 볕이 참 좋아! 새싹이 금방 자라겠는걸?',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 15,
-                                height: 1.4,
+                              child: ConstrainedBox(
+                                // 🔥 채팅창의 최대 높이를 120 픽셀로 제한
+                                constraints: const BoxConstraints(
+                                  maxHeight: 120,
+                                ),
+                                // 🔥 글자를 통째로 투명하게 만들던 ShaderMask 제거
+                                child: SingleChildScrollView(
+                                  // reverse: true 덕분에 글이 길어지면 항상 맨 아래(최신 대화)로 자동 스크롤됨
+                                  reverse: true,
+                                  child: Text(
+                                    _currentAiText,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 15,
+                                      height: 1.4,
+                                    ),
+                                    softWrap: true,
+                                  ),
+                                ),
                               ),
-                              softWrap: true,
                             ),
                           ),
                         ),
