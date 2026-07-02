@@ -1,17 +1,43 @@
-# weathexer
+# 프로젝트명 (임시) WheaterExer
 
-A new Flutter project.
+> 간단 소개: Live2D를 사용한 캐릭터가 각자의 성격을 가지고 사용자와 상호작용하며 날씨에 대한 정보를 알려주는 앱
 
-## Getting Started
+> 개발 배경: 날씨만 확인하고 종료하는 날씨앱이 아닌 국경일이나 국가기념일 등 유용한 정보를 재미있게 확인할 수 있는 날씨 앱의 부재,
 
-This project is a starting point for a Flutter application.
+## 주요 기능 (Main Features)
 
-A few resources to get you started if this is your first Flutter project:
+> 날씨 확인 및 대화 기능
 
-- [Learn Flutter](https://docs.flutter.dev/get-started/learn-flutter)
-- [Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Flutter learning resources](https://docs.flutter.dev/reference/learning-resources)
+1. 날씨 탭의 기본 화면에서 움직이고 말하는 캐릭터와 채팅을 통해 날씨 및 이야기를 할 수 있습니다.
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+2. 날씨 탭의 기본 화면에서 바텀시트를 위로 올려 상세 정보를 확인할 수 있습니다 상세 정보에는 시간 별, 일별 날씨, 미세먼지 농도, 기압 등 다양한 정보가 표시됩니다.
+
+
+
+> (미정) 신체 정보 확인 및 운동 코칭 기능
+
+1. 운동 탭의 기본화면에서, 사용자가 설정한 캐릭터가 신체 정보를 알려줍니다
+
+2. 날씨 및 사용자의 장비 보유 유무, 체중이나 몸 상태에 따라 운동을 추천해줍니다
+
+
+> 가챠 시스템 (수익화 모델 예정)
+
+1. 인 앱 재화(출석 체크, 운동 등으로 획득)를 통해 새로운 캐릭터 속성을 해금할 수 있습니다 (예시: 메스가키 등) 
+
+
+## 시연 및 데모 (Demo/ScreenShot)
+
+> 스크린샷
+
+> 동영상
+
+
+## 설치 및 실행 방법 (Installation and execution
+
+
+
+
+## 기술 스택 (Tech Stacks) /추후 확정 시 수정
+
+ComfyUI + Anima, Wan2.2 + SmoothMix, See-Through/ Qwen2.5 RP or Llama Korean RP /
