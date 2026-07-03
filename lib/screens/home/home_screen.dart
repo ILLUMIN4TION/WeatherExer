@@ -26,16 +26,23 @@ class _HomeScreenState extends State<HomeScreen>
   final String _characterBasePath =
       'assets/characters/huge_breasts/summer_clear_twintail';
 
-  bool _isLoading = false; // 🔥 강제 락을 위한 새로운 변수, 더블클릭으로 서버 뻗는 거 방지
+  bool _isLoading = false; 
   final ChatService _chatService = ChatService();
-  final AudioQueueService _audioService = AudioQueueService(); // 🔥 오디오 매니저 투입!
+  final AudioQueueService _audioService = AudioQueueService();
 
   String _currentAiText = "말풍선을 터치해서 대화를 시작해 보세요!";
   bool _isTyping = false;
 
+  // 🔥 버그 해결을 위한 핵심 변수 2개 추가!
+  int? _lastPlayedIndex; // 중복 실행 방지용 인덱스 추적기
+  int _typingSessionId = 0; // 이전 타이핑 강제 종료용 세션 ID
+
   void _sendTestMessage() async {
     if (_isLoading) return; 
     _isLoading = true;
+
+    _typingSessionId++; 
+    _lastPlayedIndex = null;
 
     setState(() {
       _currentAiText = "";
@@ -45,15 +52,23 @@ class _HomeScreenState extends State<HomeScreen>
     await _audioService.clearQueue();
 
     try {
-      await for (final chunk in _chatService.sendChatMessage("냉장고에서 꺼낸 차가운 캔 음료를 식탁에 올려두었더니 캔 표면에 물방울이 맺혔습니다. 이 물방울은 어디서 온 것인지 그 과학적 이유를 설명해 주세요")) {
+      // 🔥 여기서 원하는 더미 데이터를 마음껏 넣어서 테스트할 수 있어!
+      final chatStream = _chatService.sendChatMessage(
+        "비가 오는데 방구석에서 운동 뭐할까?",
+        location: "경기도 부천시",
+        weather: "비",
+        temp: 15,
+        daysMet: 10, // 만난 지 10일째로 설정!
+      );
+
+      await for (final chunk in chatStream) {
         final String textChunk = chunk['text'] ?? "";
         final String audioBase64 = chunk['audio'] ?? "";
-
-        // 🔥 여기서 텍스트를 바로 UI에 그리지 않음!
         
-        if (audioBase64.isNotEmpty) {
-          // 오디오와 텍스트를 한 번에 서비스로 넘겨서 묶어버림
+        if (audioBase64.isNotEmpty && audioBase64.length > 50) { 
           await _audioService.addAudioChunk(audioBase64, textChunk);
+        } else if (textChunk.isNotEmpty) {
+          print("오디오 없는 텍스트 감지 (무시됨): $textChunk");
         }
       }
     } catch (e) {
@@ -78,13 +93,13 @@ class _HomeScreenState extends State<HomeScreen>
       duration: const Duration(seconds: 3),
     )..repeat();
 
-    // 🔥 sequenceStateStream 대신 currentIndexStream 사용!
-    // 오디오 파일이 큐에 추가될 때가 아니라, '실제로 다음 트랙이 스피커로 재생을 시작할 때'만 실행됨
     _audioService.player.currentIndexStream.listen((index) {
-      if (index != null && index >= 0) {
+      // 🔥 핵심 방어 로직: index가 null이 아니고, '이전에 실행한 인덱스와 다를 때만' 실행!
+      if (index != null && index >= 0 && index != _lastPlayedIndex) {
+        _lastPlayedIndex = index; // 방금 실행한 인덱스 번호 저장
+        
         final sequence = _audioService.player.sequence;
         if (sequence != null && index < sequence.length) {
-          // 지금 딱 목소리가 나오기 시작한 그 오디오 조각의 텍스트만 가져와서 타이핑!
           final textToType = sequence[index].tag as String;
           _playTypingAnimation(textToType);
         }
@@ -92,14 +107,18 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  // 🔥 한 글자씩 출력하는 타이핑 애니메이션 함수
+  // 🔥 타이핑 충돌 방지가 적용된 애니메이션 함수
   void _playTypingAnimation(String text) async {
+    _typingSessionId++; // 함수가 호출될 때마다 세션 ID 1 증가
+    final int currentSessionId = _typingSessionId; // 현재 세션 고정
+
     for (int i = 0; i < text.length; i++) {
-      if (!mounted) break;
+      // 컴포넌트가 꺼졌거나, 새로운 대화가 시작되어 세션 ID가 달라졌다면 즉시 중단(break)!
+      if (!mounted || currentSessionId != _typingSessionId) break;
+      
       setState(() {
         _currentAiText += text[i];
       });
-      // TTS 말하는 속도에 맞춰 한 글자당 50ms 대기 (속도를 조절하고 싶으면 이 숫자를 변경해!)
       await Future.delayed(const Duration(milliseconds: 50));
     }
   }

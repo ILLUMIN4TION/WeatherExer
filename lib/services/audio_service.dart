@@ -48,6 +48,7 @@ class AudioQueueService {
   Future<void> clearQueue() async {
     await _player.stop();
     await _playlist.clear();
+    // 🔥 혹시 모를 재생 위치 꼬임을 막기 위해 0초, 0번 인덱스로 완전 초기화
     _chunkIndex = 0;
   }
 }
