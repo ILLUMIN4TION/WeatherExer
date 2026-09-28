@@ -1,10 +1,11 @@
-import 'dart:convert';
 import 'dart:math' as math;
 import 'dart:ui';
 import 'package:flutter/material.dart';
-import 'package:weathexer/services/chat_service.dart';
-import 'package:flutter/services.dart';
-import 'package:weathexer/services/audio_service.dart';
+import 'package:provider/provider.dart';
+import 'package:weathexer/models/character_profile.dart';
+import 'package:weathexer/services/character_service.dart';
+import 'package:weathexer/services/weather_service.dart';
+import 'package:weathexer/viewmodels/chat_view_model.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -13,472 +14,359 @@ class HomeScreen extends StatefulWidget {
   State<HomeScreen> createState() => _HomeScreenState();
 }
 
-class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin {
-  Map<String, dynamic>? _partsData;
+class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateMixin {
   late AnimationController _idleController;
+  final TextEditingController _textController = TextEditingController();
+  final WeatherService _weatherService = WeatherService();
 
-  // 🔥 1. 날씨 및 구도 상태를 관리하는 변수 (나중에 ViewModel이나 Provider로 분리될 부분)
-  final String _currentSeason = 'spring';
-  final String _currentWeather = 'clear';
-  final String _currentAngle = 'mid'; // low, mid, high
-
-  final String _characterBasePath =
-      'assets/characters/huge_breasts/summer_clear_twintail';
-
-  bool _isLoading = false; 
-  final ChatService _chatService = ChatService();
-  final AudioQueueService _audioService = AudioQueueService();
-
-  String _currentAiText = "말풍선을 터치해서 대화를 시작해 보세요!";
-  bool _isTyping = false;
-
-  // 🔥 버그 해결을 위한 핵심 변수 2개 추가!
-  int? _lastPlayedIndex; // 중복 실행 방지용 인덱스 추적기
-  int _typingSessionId = 0; // 이전 타이핑 강제 종료용 세션 ID
-
-  void _sendTestMessage() async {
-    if (_isLoading) return; 
-    _isLoading = true;
-
-    _typingSessionId++; 
-    _lastPlayedIndex = null;
-
-    setState(() {
-      _currentAiText = "";
-      _isTyping = true;
-    });
-
-    await _audioService.clearQueue();
-
-    try {
-      // 🔥 여기서 원하는 더미 데이터를 마음껏 넣어서 테스트할 수 있어!
-      final chatStream = _chatService.sendChatMessage(
-        "비가 오는데 방구석에서 운동 뭐할까?",
-        location: "경기도 부천시",
-        weather: "비",
-        temp: 15,
-        daysMet: 10, // 만난 지 10일째로 설정!
-      );
-
-      await for (final chunk in chatStream) {
-        final String textChunk = chunk['text'] ?? "";
-        final String audioBase64 = chunk['audio'] ?? "";
-        
-        if (audioBase64.isNotEmpty && audioBase64.length > 50) { 
-          await _audioService.addAudioChunk(audioBase64, textChunk);
-        } else if (textChunk.isNotEmpty) {
-          print("오디오 없는 텍스트 감지 (무시됨): $textChunk");
-        }
-      }
-    } catch (e) {
-      setState(() {
-        _currentAiText = "연결 에러가 발생했어 ㅠㅠ";
-      });
-    } finally {
-      _isLoading = false;
-      setState(() {
-        _isTyping = false;
-      });
-    }
-  }
+  WeatherInfo? _weather;
+  String _currentSeason = 'summer';
+  String _currentWeather = 'clear';
+  final String _currentAngle = 'mid';
+  bool _isInitializing = true;
 
   @override
   void initState() {
     super.initState();
-    _loadPartsData();
-
     _idleController = AnimationController(
       vsync: this,
       duration: const Duration(seconds: 3),
     )..repeat();
-
-    _audioService.player.currentIndexStream.listen((index) {
-      // 🔥 핵심 방어 로직: index가 null이 아니고, '이전에 실행한 인덱스와 다를 때만' 실행!
-      if (index != null && index >= 0 && index != _lastPlayedIndex) {
-        _lastPlayedIndex = index; // 방금 실행한 인덱스 번호 저장
-        
-        final sequence = _audioService.player.sequence;
-        if (sequence != null && index < sequence.length) {
-          final textToType = sequence[index].tag as String;
-          _playTypingAnimation(textToType);
-        }
-      }
-    });
+    _initializeApp();
   }
 
-  // 🔥 타이핑 충돌 방지가 적용된 애니메이션 함수
-  void _playTypingAnimation(String text) async {
-    _typingSessionId++; // 함수가 호출될 때마다 세션 ID 1 증가
-    final int currentSessionId = _typingSessionId; // 현재 세션 고정
-
-    for (int i = 0; i < text.length; i++) {
-      // 컴포넌트가 꺼졌거나, 새로운 대화가 시작되어 세션 ID가 달라졌다면 즉시 중단(break)!
-      if (!mounted || currentSessionId != _typingSessionId) break;
-      
+  Future<void> _initializeApp() async {
+    try {
+      final weather = await _weatherService.getWeather();
+      if (!mounted) return;
+      final season = _weatherService.getSeason();
       setState(() {
-        _currentAiText += text[i];
+        _weather = weather;
+        _currentSeason = season;
+        _currentWeather = weather.condition.code;
+        _isInitializing = false;
       });
-      await Future.delayed(const Duration(milliseconds: 50));
+      await context.read<CharacterService>().initialize(
+          season, weather.condition.code);
+    } catch (_) {
+      if (mounted) setState(() => _isInitializing = false);
     }
-  }
-
-  Future<void> _loadPartsData() async {
-    final String jsonString = await rootBundle.loadString(
-      '$_characterBasePath/parts_info.json',
-    );
-    final Map<String, dynamic> data = json.decode(jsonString);
-    setState(() {
-      _partsData = data;
-    });
   }
 
   @override
   void dispose() {
     _idleController.dispose();
+    _textController.dispose();
     super.dispose();
   }
 
   Offset _getBreathingOffset(String partName, double progress) {
     final double t = progress * 2 * math.pi;
-    if (partName.contains('bottom') ||
-        partName.contains('leg') ||
-        partName.contains('foot')) {
-      return Offset.zero;
-    }
-    if (partName.contains('hand') || partName.contains('arm')) {
-      return Offset(0, math.sin(t - 0.5) * 3);
-    }
+    if (partName.contains('bottom') || partName.contains('leg') || partName.contains('foot')) return Offset.zero;
+    if (partName.contains('hand') || partName.contains('arm')) return Offset(0, math.sin(t - 0.5) * 3);
     return Offset(0, math.sin(t) * 4.0);
   }
 
   @override
   Widget build(BuildContext context) {
-    if (_partsData == null) {
-      return const Scaffold(
-        backgroundColor: Color(0xFF121212),
-        body: Center(child: CircularProgressIndicator()),
-      );
-    }
-
-    final firstPartInfo = _partsData!.values.first;
-    final double canvasW = firstPartInfo['canvas_width'].toDouble();
-    final double canvasH = firstPartInfo['canvas_height'].toDouble();
-
-    // 동적으로 배경 이미지 경로 생성
-    final String backgroundPath =
-        'assets/backgrounds/$_currentSeason/${_currentWeather}_$_currentAngle.png';
-
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      // 🔥 핵심 1: 배경 이미지가 화면 맨 밑끝까지 내려가도록 허용!
       extendBody: true,
-
+      resizeToAvoidBottomInset: false,
       body: Stack(
         fit: StackFit.expand,
         children: [
-          // ☁️ [Layer 1] 동적 배경 이미지
           Image.asset(
-            backgroundPath,
-            fit: BoxFit.cover, // 화면 꽉 차게 비율 유지
-            // 에러 처리: 이미지가 없을 경우 임시 색상 표시
-            errorBuilder: (context, error, stackTrace) => Container(
-              color: const Color(0xFF4A90E2),
-              alignment: Alignment.center,
-              child: const Text(
-                '배경 이미지 없음',
-                style: TextStyle(color: Colors.white),
-              ),
+            'assets/backgrounds/$_currentSeason/${_currentWeather}_$_currentAngle.png',
+            fit: BoxFit.cover,
+            errorBuilder: (_, __, ___) => const ColoredBox(
+              color: Color(0xFF2C3E50),
+              child:
+                  Center(child: Text('🌤️', style: TextStyle(fontSize: 64))),
             ),
           ),
-
-          // 💃 [Layer 2] 숨쉬는 L2D 캐릭터
           Align(
             alignment: Alignment.bottomCenter,
-            child: AnimatedBuilder(
-              animation: _idleController,
-              builder: (context, child) {
-                return AspectRatio(
-                  aspectRatio: canvasW / canvasH,
-                  child: LayoutBuilder(
-                    builder: (context, constraints) {
-                      final w = constraints.maxWidth;
-                      final h = constraints.maxHeight;
-                      List<Widget> stackChildren = [];
-
-                      _partsData!.forEach((partName, info) {
-                        final double x = info['x'].toDouble();
-                        final double y = info['y'].toDouble();
-                        final double partW = info['width'].toDouble();
-                        final double partH = info['height'].toDouble();
-
-                        final Offset currentOffset = _getBreathingOffset(
-                          partName,
-                          _idleController.value,
-                        );
-
-                        double angle = 0.0;
-                        Alignment transformAlignment = Alignment.center;
-
-                        if (partName.contains('hair')) {
-                          transformAlignment = Alignment.topCenter;
-                          final double t = _idleController.value * 2 * math.pi;
-                          angle = math.sin(t * 1.5) * 0.03;
-                        }
-
-                        stackChildren.add(
-                          Positioned(
-                            left: w * (x / canvasW),
-                            top: h * (y / canvasH),
-                            width: w * (partW / canvasW),
-                            height: h * (partH / canvasH),
-                            child: Transform.translate(
-                              offset: currentOffset,
-                              child: Transform.rotate(
-                                angle: angle,
-                                alignment: transformAlignment,
-                                child: Image.asset(
-                                  '$_characterBasePath/$partName.PNG',
-                                  fit: BoxFit.fill,
-                                ),
-                              ),
-                            ),
-                          ),
-                        );
-                      });
-
-                      return Stack(
-                        fit: StackFit.expand,
-                        children: stackChildren,
-                      );
-                    },
-                  ),
-                );
+            child: Consumer<CharacterService>(
+              builder: (context, charService, child) {
+                if (_isInitializing || !charService.isReady) {
+                  return const Padding(
+                    padding: EdgeInsets.all(40),
+                    child: Center(
+                      child:
+                          CircularProgressIndicator(color: Colors.white54),
+                    ),
+                  );
+                }
+                return _buildCharacterLayer(charService.currentOutfit);
               },
             ),
           ),
-
-          // 💬 [Layer 3] 상단 UI (위치, 온도, 글래스모피즘 말풍선)
           SafeArea(
             child: Padding(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 20.0,
-                vertical: 20.0,
-              ),
+              padding: const EdgeInsets.all(20.0),
               child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  // 좌측: 위치 및 날씨 정보
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: const [
-                      Row(
-                        children: [
-                          Icon(
-                            Icons.location_on,
-                            color: Colors.white,
-                            size: 20,
-                          ),
-                          SizedBox(width: 4),
-                          Text(
-                            '경기도 부천시',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      Text(
-                        '23°',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 80,
-                          fontWeight: FontWeight.w300,
-                          height: 1.1,
-                        ),
-                      ),
-                      Text(
-                        '맑음',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-
-                  // 우측: 글래스모피즘 말풍선
-                  Flexible(
-                    child: Padding(
-                      padding: const EdgeInsets.only(top: 20.0, left: 20.0),
-                      // 🔥 말풍선을 터치하면 백엔드 통신 시작!
-                      child: GestureDetector(
-                        onTap: _isTyping ? null : _sendTestMessage,
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(20),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-                            child: Container(
-                              padding: const EdgeInsets.all(16),
-                              decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.15),
-                                borderRadius: BorderRadius.circular(20),
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.3),
-                                  width: 1.5,
-                                ),
-                              ),
-                              child: ConstrainedBox(
-                                // 🔥 채팅창의 최대 높이를 120 픽셀로 제한
-                                constraints: const BoxConstraints(
-                                  maxHeight: 120,
-                                ),
-                                // 🔥 글자를 통째로 투명하게 만들던 ShaderMask 제거
-                                child: SingleChildScrollView(
-                                  // reverse: true 덕분에 글이 길어지면 항상 맨 아래(최신 대화)로 자동 스크롤됨
-                                  reverse: true,
-                                  child: Text(
-                                    _currentAiText,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 15,
-                                      height: 1.4,
-                                    ),
-                                    softWrap: true,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
+                  _buildWeatherInfo(),
+                  const SizedBox(width: 20),
+                  _buildAiSpeechBubble(),
+                  const SizedBox(width: 12),
+                  _buildCharacterSwitchButton(),
                 ],
               ),
             ),
           ),
-          // 📊 [Layer 4] 플로팅 아일랜드 스타일 바텀 시트
-          Align(
-            alignment: Alignment.bottomCenter,
-            // 🏝️ 화면 양옆과 아래에 여백을 주어 둥둥 떠다니는 카드 느낌 구현
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: 16.0,
-                right: 16.0,
-                bottom: 100.0,
-              ),
-              // 🔥 마우스 드래그를 허용하는 마법의 세팅
-              child: ScrollConfiguration(
-                behavior: ScrollConfiguration.of(context).copyWith(
-                  dragDevices: {
-                    PointerDeviceKind.touch,
-                    PointerDeviceKind.mouse,
-                  },
-                ),
-                child: DraggableScrollableSheet(
-                  initialChildSize: 0.12,
-                  minChildSize: 0.12,
-                  maxChildSize: 0.75, // 카드 형태라 화면 끝까지 안 올라가게 제한
-                  snap: true,
-                  builder:
-                      (
-                        BuildContext context,
-                        ScrollController scrollController,
-                      ) {
-                        return ClipRRect(
-                          // 둥둥 떠있는 느낌을 위해 4면 모두 모서리를 둥글게 처리
-                          borderRadius: BorderRadius.circular(30),
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.3),
-                                // ✨ 유리 테두리 빛 반사 효과 (대각선 그라데이션)
-                                border: Border.all(
-                                  color: Colors.white.withOpacity(0.4),
-                                  width: 1.5,
-                                ),
-                                borderRadius: BorderRadius.circular(30),
-                              ),
-                              child: ListView(
-                                controller: scrollController,
-                                padding: const EdgeInsets.symmetric(
-                                  vertical: 16,
-                                  horizontal: 24,
-                                ),
-                                children: [
-                                  // 드래그 핸들
-                                  Center(
-                                    child: Container(
-                                      width: 40,
-                                      height: 5,
-                                      decoration: BoxDecoration(
-                                        color: Colors.white.withOpacity(0.6),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(height: 30),
-                                  const Text(
-                                    "☁️ 상세 날씨 정보", // 아이콘 추가 테스트
-                                    style: TextStyle(
-                                      color: Colors.white,
-                                      fontSize: 20,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 20),
-
-                                  // TODO: 나중에 이 부분을 GridView나 예쁜 아이콘 카드로 바꿀 예정
-                                  _buildDummyWeatherInfoTile("체감 온도", "24°"),
-                                  _buildDummyWeatherInfoTile("습도", "55%"),
-                                  _buildDummyWeatherInfoTile("풍속", "3m/s"),
-                                ],
-                              ),
-                            ),
-                          ),
-                        );
-                      },
-                ),
-              ),
-            ),
+          Positioned(
+            left: 20,
+            right: 20,
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+            child: _buildChatInputArea(),
           ),
         ],
       ),
     );
   }
 
-  // 임시 정보 타일 위젯 생성기 (클래스 맨 밑에 추가해 줘)
-  Widget _buildDummyWeatherInfoTile(String title, String value) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 15),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        children: [
-          Text(
-            title,
-            style: const TextStyle(color: Colors.white70, fontSize: 16),
+  // --- 위젯 분리 (코드 가독성) ---
+
+  Widget _buildCharacterLayer(CharacterOutfit outfit) {
+    final partsData = outfit.partsData!;
+    final canvasW = outfit.canvasWidth;
+    final canvasH = outfit.canvasHeight;
+    final basePath = outfit.basePath;
+
+    return AnimatedBuilder(
+      animation: _idleController,
+      builder: (context, child) {
+        return AspectRatio(
+          aspectRatio: canvasW / canvasH,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              final w = constraints.maxWidth;
+              final h = constraints.maxHeight;
+              List<Widget> stackChildren = [];
+
+              partsData.forEach((partName, info) {
+                if (info is! Map) return;
+                final x = (info['x'] as num).toDouble();
+                final y = (info['y'] as num).toDouble();
+                final partW = (info['width'] as num).toDouble();
+                final partH = (info['height'] as num).toDouble();
+                double angle = 0.0;
+                Alignment alignment = Alignment.center;
+
+                if (partName.contains('hair')) {
+                  alignment = Alignment.topCenter;
+                  angle =
+                      math.sin(_idleController.value * 2 * math.pi * 1.5) *
+                          0.03;
+                }
+
+                stackChildren.add(
+                  Positioned(
+                    left: w * (x / canvasW),
+                    top: h * (y / canvasH),
+                    width: w * (partW / canvasW),
+                    height: h * (partH / canvasH),
+                    child: Transform.translate(
+                      offset:
+                          _getBreathingOffset(partName, _idleController.value),
+                      child: Transform.rotate(
+                        angle: angle,
+                        alignment: alignment,
+                        child: Image.asset(
+                          '$basePath/$partName.PNG',
+                          fit: BoxFit.fill,
+                          errorBuilder: (_, __, ___) =>
+                              Container(color: Colors.red.withOpacity(0.1)),
+                        ),
+                      ),
+                    ),
+                  ),
+                );
+              });
+              return Stack(fit: StackFit.expand, children: stackChildren);
+            },
           ),
-          Text(
-            value,
-            style: const TextStyle(
+        );
+      },
+    );
+  }
+
+  Widget _buildWeatherInfo() {
+    if (_weather == null) {
+      return const SizedBox(
+        width: 80,
+        height: 120,
+        child: Center(
+          child:
+              CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+        ),
+      );
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            const Icon(Icons.location_on, color: Colors.white, size: 20),
+            const SizedBox(width: 4),
+            Text(
+              _weather!.location.city,
+              style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+        Text(
+          '${_weather!.temperature.toStringAsFixed(0)}°',
+          style: const TextStyle(
               color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+              fontSize: 80,
+              fontWeight: FontWeight.w300,
+              height: 1.1),
+        ),
+        Text(
+          _weather!.conditionKorean,
+          style: const TextStyle(
+              color: Colors.white,
+              fontSize: 24,
+              fontWeight: FontWeight.w600),
+        ),
+      ],
+    );
+  }
+
+  // 🔥 ViewModel의 상태(aiText)를 구독하여 말풍선 표시
+  Widget _buildAiSpeechBubble() {
+    return Flexible(
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(20),
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: Colors.white.withOpacity(0.3), width: 1.5),
+            ),
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 120),
+              child: SingleChildScrollView(
+                reverse: true,
+                child: Consumer<ChatViewModel>(
+                  builder: (context, viewModel, child) {
+                    return Text(
+                      viewModel.currentAiText,
+                      style: const TextStyle(color: Colors.white, fontSize: 15, height: 1.4),
+                      softWrap: true,
+                    );
+                  },
+                ),
+              ),
             ),
           ),
-        ],
+        ),
       ),
+    );
+  }
+
+  Widget _buildCharacterSwitchButton() {
+    return Consumer<CharacterService>(
+      builder: (context, charService, child) {
+        final character = charService.currentCharacter;
+        return GestureDetector(
+          onTap: charService.characterCount > 1
+              ? () => charService.nextCharacter()
+              : null,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.black.withOpacity(0.4),
+              border: Border.all(
+                  color: Colors.white.withOpacity(0.3), width: 1.5),
+            ),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Text(character.emoji, style: const TextStyle(fontSize: 24)),
+                if (charService.characterCount > 1)
+                  const Icon(Icons.swap_vert,
+                      size: 10, color: Colors.white54),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _sendMessage(String message) {
+    if (message.trim().isEmpty) return;
+    context.read<ChatViewModel>().sendMessage(
+          message,
+          location: _weather?.location.city ?? '현재 위치',
+          weather: _weather?.conditionKorean ?? '맑음',
+        );
+  }
+
+  // 하단 텍스트 입력창
+  Widget _buildChatInputArea() {
+    return Consumer<ChatViewModel>(
+      builder: (context, viewModel, child) {
+        return ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.4),
+                borderRadius: BorderRadius.circular(30),
+                border: Border.all(color: Colors.white.withOpacity(0.2), width: 1.5),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      controller: _textController,
+                      style: const TextStyle(color: Colors.white),
+                      enabled: !viewModel.isLoading,
+                      onSubmitted: (value) {
+                        _sendMessage(value);
+                        _textController.clear();
+                      },
+                      decoration: const InputDecoration(
+                        hintText: "무엇이든 물어보세요...",
+                        hintStyle: TextStyle(color: Colors.white54),
+                        border: InputBorder.none,
+                      ),
+                    ),
+                  ),
+                  IconButton(
+                    icon: viewModel.isLoading 
+                        ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white))
+                        : const Icon(Icons.send, color: Colors.white),
+                    onPressed: viewModel.isLoading
+                        ? null
+                        : () {
+                            _sendMessage(_textController.text);
+                            _textController.clear();
+                            FocusScope.of(context).unfocus();
+                          },
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-// 네가 만든 화면들 import
-import 'home/home_screen.dart'; 
+import 'home/home_screen.dart';
+import 'settings/settings_screen.dart';
 
 class MainNavigation extends StatefulWidget {
   const MainNavigation({super.key});
@@ -14,38 +14,36 @@ class _MainNavigationState extends State<MainNavigation> {
 
   final List<Widget> _screens = [
     const HomeScreen(),
-    const Center(child: Text('운동', style: TextStyle(color: Colors.white))),
-    const Center(child: Text('수집', style: TextStyle(color: Colors.white))),
-    const Center(child: Text('설정', style: TextStyle(color: Colors.white))),
+    const _EmptyScreen(title: '운동', icon: Icons.fitness_center_rounded),
+    const _EmptyScreen(title: '수집', icon: Icons.star_rounded),
+    const SettingsScreen(),
   ];
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFF121212),
-      // 🔥 핵심 1: 화면 전체를 쓰기 위해 배경 연장
-      extendBody: true, 
+      extendBody: true,
       
       body: _screens[_currentIndex],
       
-      // 🔥 핵심 2: 자연스럽게 녹아드는 비네트 효과 네비게이션 바
       bottomNavigationBar: Container(
-        height: 150, // 🔥 높이를 크게 줘서 그라데이션이 길고 아주 부드럽게 풀리도록 설정
+        height: 150,
         alignment: Alignment.bottomCenter,
         decoration: BoxDecoration(
           gradient: LinearGradient(
             begin: Alignment.bottomCenter,
             end: Alignment.topCenter,
             colors: [
-              Colors.black.withOpacity(0.85), // 맨 밑바닥은 아이콘이 보여야 하니 살짝 어둡게
-              Colors.black.withOpacity(0.3),  // 중간 지점은 반투명하게 스르륵
-              Colors.transparent,             // 위쪽은 완전히 투명해짐
+              Colors.black.withOpacity(0.85),
+              Colors.black.withOpacity(0.3),
+              Colors.transparent,
             ],
           ),
         ),
         child: SafeArea(
           child: Padding(
-            padding: const EdgeInsets.only(bottom: 12.0), // 아이콘들을 화면 맨 아래쪽으로 살짝 내림
+            padding: const EdgeInsets.only(bottom: 12.0),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: [
@@ -82,6 +80,36 @@ class _MainNavigationState extends State<MainNavigation> {
               fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
               color: isSelected ? Colors.greenAccent : Colors.white.withOpacity(0.5),
             ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 빈 화면 위젯 (운동, 수집, 설정 탭용)
+class _EmptyScreen extends StatelessWidget {
+  final String title;
+  final IconData icon;
+
+  const _EmptyScreen({required this.title, required this.icon});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(icon, size: 64, color: Colors.white24),
+          const SizedBox(height: 16),
+          Text(
+            title,
+            style: const TextStyle(color: Colors.white54, fontSize: 20),
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '준비 중입니다',
+            style: TextStyle(color: Colors.white38, fontSize: 14),
           ),
         ],
       ),

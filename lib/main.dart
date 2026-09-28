@@ -1,10 +1,16 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'screens/main_navigation.dart'; // 분리한 네비게이션 파일 import
+import 'package:provider/provider.dart';
+import 'package:weathexer/screens/main_navigation.dart';
+import 'package:weathexer/services/character_service.dart';
+import 'package:weathexer/viewmodels/chat_view_model.dart';
 
-void main() {
-  // 나중에 여기에 Hive 초기화, .env 로드 같은 세팅 로직이 들어갈 자리야!
+void main() async {
+  // 1. 환경변수 로드 (.env 파일)
+  await dotenv.load(fileName: '.env');
+  
   runApp(const WeathexerApp());
 }
 
@@ -29,7 +35,13 @@ class WeathexerApp extends StatelessWidget {
           unselectedItemColor: Colors.grey,
         ),
       ),
-      home: const MainNavigation(), // 시작 화면을 네비게이션으로 지정!
+      home: MultiProvider(
+        providers: [
+          ChangeNotifierProvider(create: (_) => CharacterService()),
+          ChangeNotifierProvider(create: (_) => ChatViewModel()),
+        ],
+        child: const MainNavigation(),
+      ),
     );
   }
 }
