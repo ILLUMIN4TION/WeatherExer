@@ -205,6 +205,31 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
         ),
       );
     }
+    if (_weather!.isFallback) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.location_on, color: Colors.white, size: 20),
+              const SizedBox(width: 4),
+              Text(
+                _weather!.location.city,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '날씨 정보를\n불러올 수 없습니다',
+            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.3),
+          ),
+        ],
+      );
+    }
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -312,7 +337,9 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     context.read<ChatViewModel>().sendMessage(
           message,
           location: _weather?.location.city ?? '현재 위치',
-          weather: _weather?.conditionKorean ?? '맑음',
+          weather: (_weather != null && !_weather!.isFallback)
+              ? _weather!.conditionKorean
+              : '알 수 없음',
         );
   }
 

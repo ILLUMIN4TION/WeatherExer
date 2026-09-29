@@ -1,8 +1,6 @@
 import 'dart:convert';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:geolocator/geolocator.dart';
 import 'package:http/http.dart' as http;
-import '../core/utils/kma_converter.dart';
 
 /// 날씨 상태 enum
 enum WeatherCondition {
@@ -14,6 +12,20 @@ enum WeatherCondition {
   final String korean;
   final String code;
   const WeatherCondition(this.korean, this.code);
+
+  /// 서버가 보내는 condition_code → enum 매핑 (unknown/미상 → clear)
+  static WeatherCondition fromCode(String? code) {
+    switch (code) {
+      case 'rain':
+        return WeatherCondition.rain;
+      case 'snow':
+        return WeatherCondition.snow;
+      case 'cloudy':
+        return WeatherCondition.cloudy;
+      default:
+        return WeatherCondition.clear;
+    }
+  }
 }
 
 /// 위치 정보 모델
@@ -36,159 +48,112 @@ class WeatherInfo {
   final LocationInfo location;
   final WeatherCondition condition;
   final double temperature;
+  final double? feelsLike;
+  final int? humidity;
+  final double? windSpeed;
+  final double? tempMin;
+  final double? tempMax;
+  final int? precipProbMax;
+  final bool isFallback;
 
   const WeatherInfo({
     required this.location,
     required this.condition,
     required this.temperature,
+    this.feelsLike,
+    this.humidity,
+    this.windSpeed,
+    this.tempMin,
+    this.tempMax,
+    this.precipProbMax,
+    this.isFallback = false,
   });
 
   String get conditionKorean => condition.korean;
   String get conditionCode => condition.code;
 }
 
-/// 날씨 서비스 - 실제 API 연동 준비용
+/// 날씨 서비스.
+///
+/// KMA를 직접 호출하지 않고 FastAPI 백엔드(`GET /weather` → 기상청)로 통일한다.
+/// (구조: Flutter → FastAPI → WeatherService → KMA)
+/// 백엔드/기상청에서 데이터를 못 받아도 앱은 크래시하지 않고 명시적 fallback으로 표시한다.
 class WeatherService {
-  static const _kmaApiKey = String.fromEnvironment(
-    'KMA_API_KEY',
-    defaultValue: '',
-  );
-  
-  /// .env에서 API 키 로드
-  String get apiKey => dotenv.get('KMA_API_KEY', fallback: '');
+  final String _baseUrl =
+      dotenv.env['BACKEND_URL'] ?? "http://192.168.0.40:8000";
 
-  /// 위치 권한 확인
-  Future<bool> _checkLocationPermission() async {
-    bool serviceEnabled = await Geolocator.isLocationServiceEnabled();
-    if (!serviceEnabled) return false;
-
-    LocationPermission permission = await Geolocator.checkPermission();
-    if (permission == LocationPermission.denied) {
-      permission = await Geolocator.requestPermission();
-      if (permission == LocationPermission.denied) return false;
-    }
-    return permission != LocationPermission.deniedForever;
-  }
-
-  /// 현재 위치 가져오기
-  Future<Position?> getCurrentPosition() async {
-    if (!await _checkLocationPermission()) return null;
-    return await Geolocator.getCurrentPosition(
-      desiredAccuracy: LocationAccuracy.high,
-    );
-  }
-
-  /// 현재 날씨 조회 (기상청 단기예보 API)
+  /// 현재 날씨 조회 (백엔드 `GET /weather` → 기상청 단기예보)
   Future<WeatherInfo> getWeather() async {
     try {
-      final position = await getCurrentPosition();
-      final lat = position?.latitude ?? _defaultWeather.location.latitude;
-      final lon = position?.longitude ?? _defaultWeather.location.longitude;
-
-      if (apiKey.isEmpty || apiKey.contains('temporary')) {
-        print('KMA API key not set, using default weather');
-        return _defaultWeather;
-      }
-
-      final grid = KmaConverter.latLonToGrid(lat, lon);
-      final nx = grid['x']!;
-      final ny = grid['y']!;
-
-      final now = DateTime.now();
-      final baseDate =
-          '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}';
-      final baseHour = (now.hour ~/ 3) * 3;
-      final baseTime = '${baseHour.toString().padLeft(4, '0')}00';
-      final encodedKey = Uri.encodeComponent(apiKey);
-
-      final response = await http
-          .get(Uri.parse(
-            'http://apis.data.go.kr/1360000/VilageFcstInfoService_2.0/getVilageFcst'
-            '?serviceKey=$encodedKey'
-            '&nx=$nx&ny=$ny'
-            '&dataType=json'
-            '&base_date=$baseDate'
-            '&base_time=$baseTime',
-          ))
-          .timeout(const Duration(seconds: 10));
+      final uri = Uri.parse('$_baseUrl/weather');
+      final response =
+          await http.get(uri).timeout(const Duration(seconds: 10));
 
       if (response.statusCode != 200) {
-        print('KMA API HTTP error: ${response.statusCode}');
-        return _defaultWeather;
+        return fallbackWeather('HTTP ${response.statusCode}');
       }
 
       final data = jsonDecode(response.body);
-      final header = data['response']['header'];
-      if (header['resultCode'] != '200') {
-        print('KMA API result error: ${header['resultMsg']}');
-        return _defaultWeather;
-      }
+      final current =
+          data['current'] is Map ? data['current'] : <String, dynamic>{};
+      final today = data['today'] is Map ? data['today'] : <String, dynamic>{};
+      final isFallback = data['is_fallback'] == true;
 
-      final items = (data['response']['body']['items'] as List?) ?? [];
-      double temperature = 0;
-      String pty = '0';
-      String sky = '1';
-      bool gotTemp = false, gotPty = false, gotSky = false;
-
-      for (final item in items) {
-        final category = item['category'] as String?;
-        final fcstValue = (item['fcstValue'] as num?)?.toString() ?? '';
-        if (!gotTemp && category == 'TMP') {
-          temperature = double.tryParse(fcstValue) ?? 0;
-          gotTemp = true;
-        }
-        if (!gotPty && category == 'PTY') {
-          pty = fcstValue;
-          gotPty = true;
-        }
-        if (!gotSky && category == 'SKY') {
-          sky = fcstValue;
-          gotSky = true;
-        }
-      }
-
-      final condition = _determineCondition(pty, sky);
-      print('Weather: ${condition.korean} ${temperature.toStringAsFixed(1)}C');
-
+      final locationName = _str(data['location_name']) ?? '부천시';
       return WeatherInfo(
         location: LocationInfo(
-          city: position != null ? '현재 위치' : '부천시',
-          fullAddress: position != null
-              ? '위도 ${lat.toStringAsFixed(4)}, 경도 ${lon.toStringAsFixed(4)}'
-              : '경기도 부천시',
-          latitude: lat,
-          longitude: lon,
+          city: locationName,
+          fullAddress: locationName,
+          latitude: _num(data['latitude']) ?? 0.0,
+          longitude: _num(data['longitude']) ?? 0.0,
         ),
-        condition: condition,
-        temperature: temperature,
+        condition: WeatherCondition.fromCode(_str(current['condition_code'])),
+        temperature: _num(current['temperature']) ?? 0.0,
+        feelsLike: _num(current['feels_like']),
+        humidity: _int(current['humidity']),
+        windSpeed: _num(current['wind_speed']),
+        tempMin: _num(today['temp_min']),
+        tempMax: _num(today['temp_max']),
+        precipProbMax: _int(today['precip_prob_max']),
+        isFallback: isFallback,
       );
     } catch (e) {
       print('Weather fetch failed: $e');
-      return _defaultWeather;
+      return fallbackWeather(e.toString());
     }
   }
 
-  /// PTY + SKY에서 날씨 상태 결정
-  /// PTY: 0=없음, 1=비, 2=비/눈, 3=눈
-  /// SKY: 1=맑음, 2=구름조금, 3=구름많음, 4=흐림
-  WeatherCondition _determineCondition(String pty, String sky) {
-    if (pty == '1' || pty == '2') return WeatherCondition.rain;
-    if (pty == '3') return WeatherCondition.snow;
-    if (sky == '1') return WeatherCondition.clear;
-    return WeatherCondition.cloudy;
+  /// 백엔드/기상청에서 데이터를 못 받을 때의 명시적 fallback.
+  /// (가짜 기본값을 쓰지 않고 isFallback=true로 UI에 안내한다)
+  WeatherInfo fallbackWeather(String reason) {
+    print('Weather fallback: $reason');
+    return const WeatherInfo(
+      location: LocationInfo(
+        city: '부천시',
+        fullAddress: '경기도 부천시',
+        latitude: 0.0,
+        longitude: 0.0,
+      ),
+      condition: WeatherCondition.clear,
+      temperature: 0.0,
+      isFallback: true,
+    );
   }
 
-  /// 개발 중 기본 날씨 값
-  static const _defaultWeather = WeatherInfo(
-    location: LocationInfo(
-      city: '부천시',
-      fullAddress: '경기도 부천시',
-      latitude: 37.4979,
-      longitude: 126.7831,
-    ),
-    condition: WeatherCondition.clear,
-    temperature: 23.0,
-  );
+  String? _str(dynamic v) => v?.toString();
+
+  double? _num(dynamic v) {
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  int? _int(dynamic v) {
+    if (v is int) return v;
+    if (v is num) return v.toInt();
+    if (v is String) return int.tryParse(v);
+    return null;
+  }
 
   /// 시즌 반환
   String getSeason() {
