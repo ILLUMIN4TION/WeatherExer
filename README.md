@@ -46,7 +46,7 @@
 | :--- | :--- | :--- |
 | **OS** | Windows 10 / 11 (64-bit) | Windows 11 (64-bit) |
 | **GPU** | NVIDIA GeForce RTX 3060 (12GB) | NVIDIA GeForce RTX 4080 (16GB) 이상 |
-| **VRAM** | **최소 12GB 이상** (일부 CPU 오프로드 필수) | **16GB ~ 24GB 이상** (전체 GPU 추론 가능) |
+| **VRAM** | **최소 12GB 이상** (일부 （RAM） 오프로드 필수) | **16GB ~ 24GB 이상** (전체 GPU 추론 가능) |
 | **CPU** | Intel Core i5 / AMD Ryzen 5 (AVX2 지원) | Intel Core i7 / AMD Ryzen 7 이상 |
 | **RAM** | 16 GB | 32 GB 이상 (Flutter 에뮬레이터 구동 고려) |
 | **Storage** | 50GB 이상의 여유 공간 | NVMe M.2 SSD (모델 빠른 로딩용) |
