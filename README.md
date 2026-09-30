@@ -6,6 +6,10 @@
 >
 > **개발 배경**
 > "날씨만 확인하고 종료"하는 날씨 앱이 아닌, 캐릭터와 **대화하며 상호작용**하는 재미있는 날씨 경험을 만들고 싶었습니다.
+>
+> **개발 기간**
+> "2026.06 - 현재
+>
 
 ## 주요 기능 (Main Features)
 
@@ -89,5 +93,5 @@ flutter run
 
 **에셋 / 콘텐츠 제작**
 
-- 캐릭터·배경 아트: **ComfyUI + Anima**, **Wan2.2 + SmoothMix**, See-Through
-- RP 모델: Qwen2.5 RP / Llama Korean RP *(검토 중)*
+- 캐릭터·배경 아트: **ComfyUI + Anima**, See-Through (자동 파츠화)
+- 모델: 현재 Qwen 3.8 27B Q4_K_M, 실제 서비스 시에는 Qwen2.5 14B insturct Q4_K_M 사용
