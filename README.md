@@ -24,10 +24,11 @@
 
 > 📸 스크린샷
 >
-> *(아직 없음 — 추후 추가)*
+> <img width="410" height="911" alt="스크린샷 2026-09-30 212013" src="https://github.com/user-attachments/assets/d8804baa-0b21-4599-bbdd-0777c29ff072" />
 >
-> 🎬 동영상
-[![데모 영상 보기](https://youtube.com)](https://youtube.com/shorts/EeLxd5UOcOE)
+>  동영상
+> 데모 영상은 노션 링크로 대체합니다, 파일 용량 문제 때문에 임베드가 되지 않는 문제가 있습니다.
+> https://app.notion.com/p/WeatherExer-AI-3ea0f219a3fd80a58eefc6eb066cc1ca
 
 
 ## 설치 및 실행 방법 (Installation & Execution)
