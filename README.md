@@ -99,7 +99,7 @@ flutter pub get
 flutter run
 ```
 
-> 📖 상세한 아키텍처 · API · 개발 이력은 **[기획서](./WHEATEREXER_기획서.md)** 참고.
+> 📖 상세한 아키텍처 · API · 개발 이력은 **[기획서](https://hissing-pineapple-d11.notion.site/WeatherExer-AI-3ea0f219a3fd80a58eefc6eb066cc1ca)** 참고.
 
 ## 기술 스택 (Tech Stacks)
 
