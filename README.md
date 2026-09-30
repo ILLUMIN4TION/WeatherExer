@@ -29,7 +29,7 @@
 > 동영상
 >
 > 데모 영상은 노션 링크로 대체합니다, 파일 용량 문제 때문에 임베드가 되지 않는 문제가 있습니다.
-> https://app.notion.com/p/WeatherExer-AI-3ea0f219a3fd80a58eefc6eb066cc1ca
+> 반드시 노션으로 사이트 제작해서 배포(지금은 개인페이지임, 추후 노션사이트 만들어지면 여기에 올리기)
 
 
 ## 설치 및 실행 방법 (Installation & Execution)
