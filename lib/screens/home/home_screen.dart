@@ -105,14 +105,19 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
           SafeArea(
             child: Padding(
               padding: const EdgeInsets.all(20.0),
-              child: Row(
+              child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildWeatherInfo(),
-                  const SizedBox(width: 20),
-                  _buildAiSpeechBubble(),
-                  const SizedBox(width: 12),
-                  _buildCharacterSwitchButton(),
+                  const SizedBox(height: 12),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      _buildAiSpeechBubble(),
+                      const SizedBox(width: 12),
+                      _buildCharacterSwitchButton(),
+                    ],
+                  ),
                 ],
               ),
             ),
@@ -194,75 +199,174 @@ class _HomeScreenState extends State<HomeScreen> with SingleTickerProviderStateM
     );
   }
 
+  // --- 현재(단기) 날씨 정보 (글래스모피즘 카드) ---
+  // 캐릭터(하단 중앙)를 가리지 않도록 상단 전체 너비로 배치
   Widget _buildWeatherInfo() {
+    const accent = Color(0xFF00E676);
     if (_weather == null) {
-      return const SizedBox(
-        width: 80,
-        height: 120,
-        child: Center(
-          child:
-              CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
+      return _glassCard(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 22),
+        child: const SizedBox(
+          width: 22,
+          height: 22,
+          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white54),
         ),
       );
     }
     if (_weather!.isFallback) {
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              const Icon(Icons.location_on, color: Colors.white, size: 20),
-              const SizedBox(width: 4),
-              Text(
-                _weather!.location.city,
-                style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '날씨 정보를\n불러올 수 없습니다',
-            style: TextStyle(color: Colors.white, fontSize: 15, height: 1.3),
-          ),
-        ],
-      );
-    }
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
+      return _glassCard(
+        child: Row(
           children: [
-            const Icon(Icons.location_on, color: Colors.white, size: 20),
-            const SizedBox(width: 4),
-            Text(
-              _weather!.location.city,
-              style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold),
+            const Icon(Icons.cloud_off, color: accent, size: 18),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                '기상청 데이터를 불러오지 못했어요\n현재 위치: ${_weather!.location.city}',
+                style: TextStyle(color: Colors.white70, fontSize: 13, height: 1.3),
+              ),
             ),
           ],
         ),
-        Text(
-          '${_weather!.temperature.toStringAsFixed(0)}°',
-          style: const TextStyle(
-              color: Colors.white,
-              fontSize: 80,
-              fontWeight: FontWeight.w300,
-              height: 1.1),
+      );
+    }
+    final w = _weather!;
+    final upcoming = _upcomingForecasts(w);
+    return _glassCard(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 1행: 위치 + 현재기온 + 상태
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              const Icon(Icons.location_on, color: accent, size: 18),
+              const SizedBox(width: 5),
+              Text(
+                w.location.city,
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600),
+              ),
+              const SizedBox(width: 10),
+              Text(
+                '${w.temperature.toStringAsFixed(0)}°',
+                style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w300,
+                    height: 1.0),
+              ),
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  Text(
+                    w.conditionKorean,
+                    style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600),
+                  ),
+                  if (w.feelsLike != null)
+                    Text(
+                      '체감 ${w.feelsLike!.toStringAsFixed(0)}°',
+                      style:
+                          const TextStyle(color: Colors.white70, fontSize: 11),
+                    ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          Container(height: 1, color: Colors.white.withOpacity(0.15)),
+          const SizedBox(height: 10),
+          // 2행: 단기 지표 (습도 / 풍속 / 강수확률 / 오늘 기온)
+          Wrap(
+            spacing: 14,
+            runSpacing: 6,
+            children: [
+              _buildMetric(Icons.water_drop, _fmtHumidity(w.humidity)),
+              _buildMetric(Icons.air, _fmtWind(w.windSpeed)),
+              _buildMetric(Icons.opacity, _fmtPrecip(w.precipProbMax)),
+              _buildMetric(Icons.thermostat, _fmtToday(w.tempMin, w.tempMax)),
+            ],
+          ),
+          if (upcoming.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Container(height: 1, color: Colors.white.withOpacity(0.15)),
+            const SizedBox(height: 8),
+            // 3행: 일별 예보 (내일 / 글피)
+            Wrap(
+              spacing: 14,
+              runSpacing: 6,
+              children: [
+                for (final f in upcoming)
+                  _buildMetric(Icons.event, _fmtForecast(f)),
+              ],
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 글래스모피즘 공통 카드 (배경 블러 15 + 반투명)
+  Widget _glassCard({required Widget child, EdgeInsetsGeometry? padding}) {
+    return ClipRRect(
+      borderRadius: BorderRadius.circular(14),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15),
+        child: Container(
+          width: double.infinity,
+          padding:
+              padding ?? const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.10),
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(color: Colors.white.withOpacity(0.20), width: 1.5),
+          ),
+          child: child,
         ),
-        Text(
-          _weather!.conditionKorean,
-          style: const TextStyle(
-              color: Colors.white,
-              fontSize: 24,
-              fontWeight: FontWeight.w600),
-        ),
+      ),
+    );
+  }
+
+  Widget _buildMetric(IconData icon, String value) {
+    if (value.isEmpty) return const SizedBox.shrink();
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Icon(icon, color: Colors.white54, size: 13),
+        const SizedBox(width: 4),
+        Text(value, style: const TextStyle(color: Colors.white, fontSize: 13)),
       ],
     );
+  }
+
+  String _fmtHumidity(int? v) => v == null ? '' : '습도 $v%';
+  String _fmtWind(double? v) => v == null ? '' : '풍속 ${v.toStringAsFixed(1)}';
+  String _fmtPrecip(int? v) => v == null ? '' : '강수 $v%';
+  String _fmtToday(double? min, double? max) =>
+      (min == null || max == null)
+          ? ''
+          : '오늘 ${min.toStringAsFixed(0)}°~${max.toStringAsFixed(0)}°';
+
+  /// 내일/글피 예보 (카드 3행용, "오늘"은 2행에 이미 표시됨)
+  List<DailyForecastInfo> _upcomingForecasts(WeatherInfo w) => w.forecast
+      .where((f) => f.label.isNotEmpty && f.label != '오늘')
+      .take(2)
+      .toList();
+
+  String _fmtForecast(DailyForecastInfo f) {
+    final parts = <String>[f.label];
+    if (f.tempMin != null && f.tempMax != null) {
+      parts.add(
+          '${f.tempMin!.toStringAsFixed(0)}°~${f.tempMax!.toStringAsFixed(0)}°');
+    }
+    if (f.conditionKorean.isNotEmpty) parts.add(f.conditionKorean);
+    return parts.join(' ');
   }
 
   // 🔥 ViewModel의 상태(aiText)를 구독하여 말풍선 표시

@@ -54,6 +54,7 @@ class WeatherInfo {
   final double? tempMin;
   final double? tempMax;
   final int? precipProbMax;
+  final List<DailyForecastInfo> forecast;
   final bool isFallback;
 
   const WeatherInfo({
@@ -66,11 +67,35 @@ class WeatherInfo {
     this.tempMin,
     this.tempMax,
     this.precipProbMax,
+    this.forecast = const [],
     this.isFallback = false,
   });
 
   String get conditionKorean => condition.korean;
   String get conditionCode => condition.code;
+}
+
+/// 일별 예보 모델 (오늘 / 내일 / 글피 등)
+class DailyForecastInfo {
+  final String date;      // "2026-10-01"
+  final String label;     // "오늘" | "내일" | "글피" | "10월 3일"
+  final String weekday;   // "수"
+  final double? tempMin;
+  final double? tempMax;
+  final String conditionKorean;
+  final String conditionCode;
+  final int? precipProbMax;
+
+  const DailyForecastInfo({
+    required this.date,
+    required this.label,
+    required this.weekday,
+    this.tempMin,
+    this.tempMax,
+    this.conditionKorean = '',
+    this.conditionCode = 'clear',
+    this.precipProbMax,
+  });
 }
 
 /// 날씨 서비스.
@@ -98,6 +123,7 @@ class WeatherService {
           data['current'] is Map ? data['current'] : <String, dynamic>{};
       final today = data['today'] is Map ? data['today'] : <String, dynamic>{};
       final isFallback = data['is_fallback'] == true;
+      final forecast = _parseForecast(data['forecast']);
 
       final locationName = _str(data['location_name']) ?? '부천시';
       return WeatherInfo(
@@ -115,6 +141,7 @@ class WeatherService {
         tempMin: _num(today['temp_min']),
         tempMax: _num(today['temp_max']),
         precipProbMax: _int(today['precip_prob_max']),
+        forecast: forecast,
         isFallback: isFallback,
       );
     } catch (e) {
@@ -138,6 +165,26 @@ class WeatherService {
       temperature: 0.0,
       isFallback: true,
     );
+  }
+
+  /// 백엔드 `forecast` 배열 → 일별 예보 리스트 (오늘/내일/글피 ...)
+  List<DailyForecastInfo> _parseForecast(dynamic raw) {
+    final list = <DailyForecastInfo>[];
+    if (raw is! List) return list;
+    for (final item in raw) {
+      if (item is! Map) continue;
+      list.add(DailyForecastInfo(
+        date: _str(item['date']) ?? '',
+        label: _str(item['label']) ?? '',
+        weekday: _str(item['weekday']) ?? '',
+        tempMin: _num(item['temp_min']),
+        tempMax: _num(item['temp_max']),
+        conditionKorean: _str(item['condition_korean']) ?? '',
+        conditionCode: _str(item['condition_code']) ?? 'clear',
+        precipProbMax: _int(item['precip_prob_max']),
+      ));
+    }
+    return list;
   }
 
   String? _str(dynamic v) => v?.toString();
