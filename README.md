@@ -27,8 +27,8 @@
 > *(아직 없음 — 추후 추가)*
 >
 > 🎬 동영상
->
-> *(아직 없음 — 추후 추가)*
+>https://youtube.com/shorts/EeLxd5UOcOE
+
 
 ## 설치 및 실행 방법 (Installation & Execution)
 
