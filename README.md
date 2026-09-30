@@ -116,5 +116,8 @@ flutter run
 
 **에셋 / 콘텐츠 제작**
 
+배경 및 캐릭터 에셋 제작
+ComfyUI - Anima diffusion model(이미지 생성) + See-through custom node(이미지파츠화)
+
 개발/테스트: Qwen3.8 27B Q4_K_M
 앱 서비스: Qwen2.5 14B Instruct Q4_K_M
