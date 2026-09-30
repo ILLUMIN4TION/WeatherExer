@@ -38,7 +38,25 @@
 
 ## 설치 및 실행 방법 (Installation & Execution)
 
-> Windows + GPU PC 권장. **서버 3개 + Flutter 앱** 구성입니다.
+### 시스템 요구 사양 (System Requirements)
+
+로컬 환경에서 LLM(대형 언어 모델)과 고성능 TTS 서버를 동시에 구동하므로, 안정적인 실시간 음성 합성을 위해 **NVIDIA GPU** 환경이 필수적입니다.
+
+| 항목 | 최소 사양 (Minimum) | 권장 사양 (Recommended) |
+| :--- | :--- | :--- |
+| **OS** | Windows 10 / 11 (64-bit) | Windows 11 (64-bit) |
+| **GPU** | NVIDIA GeForce RTX 3060 (12GB) | NVIDIA GeForce RTX 4080 (16GB) 이상 |
+| **VRAM** | **최소 12GB 이상** (일부 CPU 오프로드 필수) | **16GB ~ 24GB 이상** (전체 GPU 추론 가능) |
+| **CPU** | Intel Core i5 / AMD Ryzen 5 (AVX2 지원) | Intel Core i7 / AMD Ryzen 7 이상 |
+| **RAM** | 16 GB | 32 GB 이상 (Flutter 에뮬레이터 구동 고려) |
+| **Storage** | 50GB 이상의 여유 공간 | NVMe M.2 SSD (모델 빠른 로딩용) |
+
+> 💡 **참고 (VRAM 점유 예측):** 
+> * Qwen 2.5 14B Q4_K_M 추론 시 약 `9.5GB` 점유
+> * GPT-SoVITS 한국어 음성 추론 시 약 `5.5GB` 점유
+> * 두 모델 동시 구동 시 순수 AI 엔진으로만 **최소 15GB 내외의 VRAM**이 요구됩니다. VRAM
+
+> Windows + GPU PC 권장. **서버 3개 + Flutter 앱** 구성입니다.(Win11, RTX5090에서 테스트)
 
 ### 1) 서버 (백엔드)
 
