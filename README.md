@@ -60,7 +60,7 @@
 > * Windows + GPU PC 권장. **서버 3개 + Flutter 앱** 구성입니다
 
 ### 기상청 API 발급 받기
-https://www.data.go.kr/data/15084084/openapi.do에서 활용 신청을 하고 API키를 발급받습니다 
+https://www.data.go.kr/data/15084084/openapi.do 에서 활용 신청을 하고 API키를 발급받습니다 
 이후 .env에 KMA_API_KEY 키 등으로 사용하면 됩니다.
 
 ### 1) 서버 (백엔드)
