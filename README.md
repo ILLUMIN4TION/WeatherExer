@@ -27,7 +27,7 @@
 > *(아직 없음 — 추후 추가)*
 >
 > 🎬 동영상
->https://youtube.com/shorts/EeLxd5UOcOE
+[![데모 영상 보기](https://youtube.com)](https://youtube.com/shorts/EeLxd5UOcOE)
 
 
 ## 설치 및 실행 방법 (Installation & Execution)
