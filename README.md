@@ -26,7 +26,7 @@
 >
 > <img width="410" height="911" alt="스크린샷 2026-09-30 212013" src="https://github.com/user-attachments/assets/d8804baa-0b21-4599-bbdd-0777c29ff072" />
 >
-> 동영상
+> 동영상 (YouTube)
 >
 > 데모 영상은 Notion 프로젝트 페이지에서 확인할 수 있습니다.
 > https://hissing-pineapple-d11.notion.site/WeatherExer-AI-3ea0f219a3fd80a58eefc6eb066cc1ca
@@ -69,15 +69,18 @@ https://www.data.go.kr/data/15084084/openapi.do 에서 활용 신청을 하고 A
 
 ```powershell
 # (각각 별도 터미널/창에서)
-E:\WheaterExer_AI\start_tts.ps1   # TTS      :9880
-E:\WheaterExer_AI\start_api.ps1   # FastAPI  :8000  (venv python 사용, PYTHONUTF8=1 자동)
+Server\start_tts.ps1     # TTS      :9880 (GPT-SoVITS, PYTHONUTF8=1 자동)
+Server\start_api.ps1     # FastAPI  :8000 (venv python, PYTHONUTF8=1 자동)
 # LLM(llama-server :8080)은 llama.cpp로 별도로 기동
 
-E:\WheaterExer_AI\status.ps1      # 9880 / 8000 / 8080 LISTENING 여부 확인
-E:\WheaterExer_AI\stop_servers.ps1# 서버 종료
+Server\status.ps1        # 9880 / 8000 / 8080 LISTENING 여부 확인
+Server\stop_servers.ps1  # TTS + FastAPI 서버 종료
+Server\e2e_test.ps1      # /chat E2E 자동 테스트 (Qwen→TTS→SSE→WAV, PASS/FAIL)
 ```
 
-- `Server\.env`: `LLM_URL`, `TTS_URL`, `KMA_API_KEY` 등 설정
+- `Server/.env.example`: `LLM_URL`, `TTS_URL`, `KMA_API_KEY` 등 설정 예시
+  (실제 `.env`는 API 키 포함으로 공개하지 않습니다 — `.env.example`을 복사한 뒤
+  기상청에서 발급받은 키를 채워 사용하세요.)
 - FastAPI는 반드시 **venv python** 사용 (`start_api.ps1`이 처리)
 
 ### 2) Flutter 앱 (클라이언트)
