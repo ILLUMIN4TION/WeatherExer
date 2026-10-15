@@ -1,0 +1,31 @@
+# ==================================================
+# WeatherExer Server Configuration
+# .env를 이 파일 복사 후 KMA_API_KEY만 직접 발급한 값으로 교체
+# (기상청 공공데이터포털에서 API 키 발급)
+# ==================================================
+
+# ===== 기상청(KMA) API =====
+KMA_API_KEY=your_key_here
+
+# ===== 서버 구성 (신형 GPU PC 단일 실행) =====
+# LLM:  http://127.0.0.1:8080 (로컬 llama.cpp)
+# TTS:  http://127.0.0.1:9880 (로컬 GPT-SoVITS)
+# API:  http://YOUR_PC_LAN_IP:8000 (FastAPI — 앱과 통신용)
+
+LLM_URL=http://127.0.0.1:8080/v1/chat/completions
+TTS_URL=http://127.0.0.1:9880/tts
+
+# ===== TTS 설정 (GPT-SoVITS, 나히다 보이스) =====
+TTS_REF_AUDIO_PATH=C:/TTS/workspace/sliced/kr_nahida.mp3_0000217920_0000427520.wav
+TTS_PROMPT_TEXT=내 이름은 나히다, 아이처럼 보이지만 그 어떤 어른보다도 이 세상을 잘 알고 있지.
+
+# ===== Flutter 앱 클라이언트 (에뮬레이터/실기기용) =====
+# ⚠️ 에뮬레이터: 10.0.2.2 (호스트 PC 가리키는 alias)
+#    실기기(WiFi, PC와 같은 네트워크): BACKEND_URL=http://YOUR_PC_LAN_IP:8000
+BACKEND_URL=http://10.0.2.2:8000
+
+# ===== (선택) 기본값이 있어 비워두면 코드 기본값 사용 =====
+# API_HOST=0.0.0.0
+# API_PORT=8000
+# WEATHER_CACHE_TTL=600
+# WEATHER_LOCATION=bucheon-simgok1
